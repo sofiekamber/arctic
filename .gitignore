@@ -1,3 +1,9 @@
 .DS_Store
 __pycache__
 /data
+outputs/*
+unpack/*
+logs/*
+downloads/*
+.idea/*
+scripts_data/logs/*
