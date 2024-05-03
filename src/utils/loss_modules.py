@@ -3,6 +3,8 @@ import torch.nn as nn
 
 import common.torch_utils as torch_utils
 from common.torch_utils import nanmean
+import coap
+from common.body_models import build_mano_aa
 
 l1_loss = nn.L1Loss(reduction="none")
 mse_loss = nn.MSELoss(reduction="none")
@@ -55,6 +57,40 @@ def contact_deviation(pred_v3d_o, pred_v3d_r, dist_ro, idx_ro, is_valid, _right_
     cd = (disp_ro**2).sum(dim=2).sqrt()
     err_ro = torch_utils.nanmean(cd, axis=1)  # .cpu().numpy()  # m
     return err_ro
+
+def compute_coap_loss(pred):
+    coap_loss_r = compute_coap_loss(pred["object.v.cam"], pred["mano.beta.r"], pred["mano.pose.r"], is_right = True)
+    coap_loss_l = compute_coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.pose.l"], is_right = False)
+
+    return coap_loss_r, coap_loss_l
+
+
+def coap_loss(pred_v3d_object, pred_betas_r, pred_rotmat_r, is_right):
+    model = build_mano_aa(is_right)
+    model.NUM_HAND_JOINTS = 16
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu" #TODO: clean this
+    model = coap.attach_coap(model, pretrained=True, device=device)
+
+    #prep data
+    torch_param = {}
+    smpl_body_pose = torch.zeros((1, 48), dtype=torch.float, device=device)
+
+    smpl_body_pose[:, :48] = torch.from_numpy(pred_rotmat_r).to(device) #TODO: remove torch tensors conversion, change poses!
+
+    torch_param['hand_pose'] = smpl_body_pose.to(torch.float32)
+
+    torch_param['betas'] = torch.from_numpy(pred_betas_r).to(device) #TODO: remove torch tensors conversion
+
+    #torch_param['transl'] = torch.from_numpy(np.array([[-5.0101800e-003, 1.5031957e-001, 3.0754370e-002]])).to(
+    #torch.float32).to(device)
+
+    mano_output = model(**torch_param, return_verts=True, return_full_pose=True)
+
+    scene_points = pred_v3d_object
+    coap_loss, _collision_mask = model.coap.collision_loss(scene_points, mano_output, ret_collision_mask=True)
+
+    return coap_loss
 
 
 def keypoint_3d_loss(pred_keypoints_3d, gt_keypoints_3d, criterion, jts_valid):
