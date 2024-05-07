@@ -134,6 +134,16 @@ def build_mano_aa(is_rhand, create_transl=False, flat_hand=False):
         is_rhand=is_rhand,
     )
 
+def build_mano_coap(is_rhand, create_transl=False, flat_hand=False):
+    return MANO(
+        MODEL_DIR,
+        create_transl=create_transl,
+        use_pca=True,
+        num_pca_comps=1,
+        #flat_hand_mean=flat_hand, #TODO: remove?
+        is_rhand=is_rhand,
+    )
+
 
 def construct_layers(dev):
     mano_layers = {

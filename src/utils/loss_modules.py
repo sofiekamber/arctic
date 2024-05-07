@@ -4,7 +4,7 @@ import torch.nn as nn
 import common.torch_utils as torch_utils
 from common.torch_utils import nanmean
 import coap
-from common.body_models import build_mano_aa
+from common.body_models import build_mano_coap
 
 l1_loss = nn.L1Loss(reduction="none")
 mse_loss = nn.MSELoss(reduction="none")
@@ -72,35 +72,63 @@ def compute_coap_loss(pred):
 
 
 def coap_loss(pred_v3d_object, pred_betas_r, pred_rotmat_r, is_right):
-    model = build_mano_aa(is_right)
-
+    model = build_mano_coap(is_right)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu" #TODO: clean this
-    model = coap.attach_coap(model, pretrained=True, device=device)
+    model = coap.attach_coap(model, pretrained=True, device=device) #Need model with pca
+
 
     #prep data
     torch_param = {}
     smpl_body_pose = torch.zeros((1, 48), dtype=torch.float, device=device)
-
-    print("pred_rotmat_r: ",pred_rotmat_r.shape)
-    print("pred_betas_r: ", pred_betas_r.shape)
-    print("pred_v3d_object: ", pred_v3d_object.shape)
-
     #smpl_body_pose[:, :48] = pred_rotmat_r
+    torch_param['global_orient'] = torch.zeros(8, 3, device='cuda:0', requires_grad=True) #Needed for correct dimensionality!
 
-    torch_param['hand_pose'] = torch.zeros((8, 48), dtype=torch.float, device=device) #smpl_body_pose.to(torch.float32)
-
-
+    torch_param['hand_pose'] = torch.zeros((8, 48), dtype=torch.float, device=device) #smpl_body_pose.to(torch.float32) #TODO: convert rotation matrix to vector
     torch_param['betas'] = pred_betas_r
+    #torch_param['transl'] = torch.from_numpy(np.array([[-5.0101800e-003, 1.5031957e-001, 3.0754370e-002]])).to(torch.float32).to(args.device)
+
 
     mano_output = model(**torch_param, return_verts=True, return_full_pose=True)
+    assert model.joint_mapper is None, 'COAP requires valid SMPL joints as input'
 
-    scene_points = pred_v3d_object
-
+    scene_points = sample_scene_points(model, mano_output, pred_v3d_object) #TODO: implement sample_scene_points for batch size > 1
+    #scene_points = pred_v3d_object
+    #scene_points = torch.zeros((8, 50, 3), dtype=torch.float, device=device)
     coap_loss, _collision_mask = model.coap.collision_loss(scene_points, mano_output, ret_collision_mask=True)
 
     return coap_loss
 
+
+@torch.no_grad()
+def sample_scene_points(model, smpl_output, scene_vertices, scene_normals=None, n_upsample=2, max_queries=10000):
+    points = scene_vertices.clone()
+    # remove points that are well outside the SMPL bounding box
+    bb_min = smpl_output.vertices.min(1).values.reshape(1, 3)
+    bb_max = smpl_output.vertices.max(1).values.reshape(1, 3)
+
+    inds = (scene_vertices >= bb_min).all(-1) & (scene_vertices <= bb_max).all(-1)
+    if not inds.any():
+        return None
+    points = scene_vertices[inds]
+    model.coap.eval()
+    colliding_inds = (model.coap.query(points.reshape((1, -1, 3)), smpl_output) > 0.5).reshape(-1)
+    model.coap.detach_cache()  # detach variables to enable differentiable pass in the opt. loop
+    if not colliding_inds.any():
+        return None
+    points = points[colliding_inds.reshape(-1)]
+
+    if scene_normals is not None and points.size(0) > 0:  # sample extra points if normals are available
+        norms = scene_normals[inds][colliding_inds]
+
+        offsets = 0.5 * torch.normal(0.05, 0.05, size=(points.shape[0] * n_upsample, 1), device=norms.device).abs()
+        verts, norms = points.repeat(n_upsample, 1), norms.repeat(n_upsample, 1)
+        points = torch.cat((points, (verts - offsets * norms).reshape(-1, 3)), dim=0)
+
+    if points.shape[0] > max_queries:
+        points = points[torch.randperm(points.size(0), device=points.device)[:max_queries]]
+
+    return points.float().reshape(1, -1, 3)  # add batch dimension
 
 def keypoint_3d_loss(pred_keypoints_3d, gt_keypoints_3d, criterion, jts_valid):
     """
