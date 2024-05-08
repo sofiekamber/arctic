@@ -59,76 +59,77 @@ def contact_deviation(pred_v3d_o, pred_v3d_r, dist_ro, idx_ro, is_valid, _right_
     return err_ro
 
 def compute_coap_loss(pred):
-    #print(pred["mano.pose.r"].shape)
-    #print(pred.keys())
-    #assert (False)
-
-    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"], pred["mano.pose.r"], is_right=True)
-    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.pose.l"], is_right=False)
-
-
+    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"], pred["mano.joints3d.r"], is_right=True)
+    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.joints3d.l"], is_right=False)
 
     return coap_loss_r, coap_loss_l
 
 
-def coap_loss(pred_v3d_object, pred_betas_r, pred_rotmat_r, is_right):
-    model = build_mano_coap(is_right)
+def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, is_right):
+    batch_size = pred_v3d_object.shape[0]
+    model = build_mano_coap(is_right, batch_size)
 
-    device = "cuda:0" if torch.cuda.is_available() else "cpu" #TODO: clean this
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = coap.attach_coap(model, pretrained=True, device=device) #Need model with pca
 
 
     #prep data
     torch_param = {}
-    smpl_body_pose = torch.zeros((1, 48), dtype=torch.float, device=device)
-    #smpl_body_pose[:, :48] = pred_rotmat_r
-    torch_param['global_orient'] = torch.zeros(8, 3, device='cuda:0', requires_grad=True) #Needed for correct dimensionality!
-
-    torch_param['hand_pose'] = torch.zeros((8, 48), dtype=torch.float, device=device) #smpl_body_pose.to(torch.float32) #TODO: convert rotation matrix to vector
+    torch_param['hand_pose'] = pred_joints3d_r[:, :16,:].view(batch_size, 48) #crop 21 joints to 16
     torch_param['betas'] = pred_betas_r
-    #torch_param['transl'] = torch.from_numpy(np.array([[-5.0101800e-003, 1.5031957e-001, 3.0754370e-002]])).to(torch.float32).to(args.device)
+    #torch_param['transl'] = torch.from_numpy(np.array([[-5.0101800e-003, 1.5031957e-001, 3.0754370e-002]])).to(torch.float32).to(args.device) #TODO:?
 
 
     mano_output = model(**torch_param, return_verts=True, return_full_pose=True)
     assert model.joint_mapper is None, 'COAP requires valid SMPL joints as input'
 
-    scene_points = sample_scene_points(model, mano_output, pred_v3d_object) #TODO: implement sample_scene_points for batch size > 1
-    #scene_points = pred_v3d_object
-    #scene_points = torch.zeros((8, 50, 3), dtype=torch.float, device=device)
+    scene_points = sample_scene_points(mano_output, pred_v3d_object, device) #check only points inside Mano bbox
+    if scene_points is None:
+        return torch.zeros(8, device=device)
+
     coap_loss, _collision_mask = model.coap.collision_loss(scene_points, mano_output, ret_collision_mask=True)
 
     return coap_loss
 
 
 @torch.no_grad()
-def sample_scene_points(model, smpl_output, scene_vertices, scene_normals=None, n_upsample=2, max_queries=10000):
-    points = scene_vertices.clone()
-    # remove points that are well outside the SMPL bounding box
-    bb_min = smpl_output.vertices.min(1).values.reshape(1, 3)
-    bb_max = smpl_output.vertices.max(1).values.reshape(1, 3)
+def sample_scene_points(mano_output, scene_vertices, device, max_queries=10000):
 
-    inds = (scene_vertices >= bb_min).all(-1) & (scene_vertices <= bb_max).all(-1)
-    if not inds.any():
+    # remove points that are outside the Mano bounding box
+    bb_min = mano_output.vertices.min(1).values
+    bb_max = mano_output.vertices.max(1).values
+
+    bb_min_expanded = bb_min.unsqueeze(1).expand_as(scene_vertices)
+    bb_max_expanded = bb_max.unsqueeze(1).expand_as(scene_vertices)
+
+    #mask containing all object points inside mano bbox
+    mask = (scene_vertices >= bb_min_expanded).all(dim=-1) & (scene_vertices <= bb_max_expanded).all(dim=-1)
+
+    max_true_count = min(mask.sum(dim=1).max(), max_queries)
+
+    if max_true_count == 0:
         return None
-    points = scene_vertices[inds]
-    model.coap.eval()
-    colliding_inds = (model.coap.query(points.reshape((1, -1, 3)), smpl_output) > 0.5).reshape(-1)
-    model.coap.detach_cache()  # detach variables to enable differentiable pass in the opt. loop
-    if not colliding_inds.any():
-        return None
-    points = points[colliding_inds.reshape(-1)]
 
-    if scene_normals is not None and points.size(0) > 0:  # sample extra points if normals are available
-        norms = scene_normals[inds][colliding_inds]
+    padded_scene_vertices = torch.empty((mask.shape[0], max_true_count, 3), dtype=scene_vertices.dtype, device=device)
 
-        offsets = 0.5 * torch.normal(0.05, 0.05, size=(points.shape[0] * n_upsample, 1), device=norms.device).abs()
-        verts, norms = points.repeat(n_upsample, 1), norms.repeat(n_upsample, 1)
-        points = torch.cat((points, (verts - offsets * norms).reshape(-1, 3)), dim=0)
+    for i in range(scene_vertices.shape[0]):
 
-    if points.shape[0] > max_queries:
-        points = points[torch.randperm(points.size(0), device=points.device)[:max_queries]]
+        true_vertices = scene_vertices[i][mask[i]]
 
-    return points.float().reshape(1, -1, 3)  # add batch dimension
+        # If the number of true vertices is less than max_true_count, pad with random vertices
+        if true_vertices.size(0) < max_true_count:
+            num_to_pad = max_true_count - true_vertices.size(0)
+
+            # Randomly sample indices from the current batch
+            random_indices = torch.randint(0, scene_vertices.shape[1], (num_to_pad,))
+
+            random_vertices = scene_vertices[i][random_indices]
+
+            padded_scene_vertices[i] = torch.cat((true_vertices, random_vertices), dim=0)
+        else:
+            padded_scene_vertices[i] = true_vertices[:max_true_count]
+
+    return padded_scene_vertices.float()
 
 def keypoint_3d_loss(pred_keypoints_3d, gt_keypoints_3d, criterion, jts_valid):
     """
