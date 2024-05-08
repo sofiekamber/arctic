@@ -85,7 +85,7 @@ def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, is_right):
 
     scene_points = sample_scene_points(mano_output, pred_v3d_object, device) #check only points inside Mano bbox
     if scene_points is None:
-        return torch.zeros(8, device=device)
+        return torch.zeros(batch_size, device=device)
 
     coap_loss, _collision_mask = model.coap.collision_loss(scene_points, mano_output, ret_collision_mask=True)
 
