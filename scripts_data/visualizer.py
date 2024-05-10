@@ -73,7 +73,7 @@ def parse_args():
 
 def main():
     with open(
-        f"./data/arctic_data/data/meta/misc.json",
+        f"/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/meta/misc.json",
         "r",
     ) as f:
         subject_meta = json.load(f)
@@ -83,7 +83,7 @@ def main():
 
     viewer = DataViewer(interactive=not args.headless, size=(2024, 2024))
     if args.seq_p is None:
-        seq_ps = glob("./outputs/processed_verts/seqs/*/*.npy")
+        seq_ps = glob("/media/sofie-kamber/EFP_Studium/arctic/outputs/processed_verts/seqs/*/*.npy")
     else:
         seq_ps = [args.seq_p]
     assert len(seq_ps) > 0, f"No seqs found on {args.seq_p}"

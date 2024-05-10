@@ -25,7 +25,7 @@ def construct_args():
         help="save data with these keys (separated by .)",
     )
     parser.add_argument(
-        "--process_folder", type=str, default="./outputs/processed/seqs"
+        "--process_folder", type=str, default="/media/sofie-kamber/EFP_Studium/arctic/outputs/processed/seqs"
     )
     args = parser.parse_args()
     return args

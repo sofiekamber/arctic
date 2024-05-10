@@ -17,7 +17,7 @@ logger.add("file_{time}.log")
 EGO_IMAGE_SCALE = 0.3
 
 with open(
-    f"./arctic_data/meta/misc.json",
+    f"/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/meta/misc.json",
     "r",
 ) as f:
     misc = json.load(f)
@@ -34,7 +34,7 @@ def transform_image(im, bbox_loose, cap_dim):
 
 def process_fname(fname, bbox_loose, sid, view_idx, pbar):
     vidx = int(op.basename(fname).split(".")[0]) - misc[sid]["ioi_offset"]
-    out_p = fname.replace("./data/arctic_data/data/images", "./outputs/croppped_images")
+    out_p = fname.replace("/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/images", "/media/sofie-kamber/EFP_Studium/arctic/outputs/croppped_images")
     num_frames = bbox_loose.shape[0]
 
     if vidx < 0:
@@ -81,7 +81,7 @@ def process_seq(seq_p):
         bbox_loose[:, 2] *= 1.5  # 1.5X around the bbox
 
         fnames = glob(
-            f"./data/arctic_data/data/images/{sid}/{seq_name}/{view_idx}/*.jpg"
+            f"/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/images/{sid}/{seq_name}/{view_idx}/*.jpg"
         )
         fnames = sorted(fnames)
         if len(fnames) == 0:
@@ -105,7 +105,7 @@ def construct_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_id", type=int, default=None)
     parser.add_argument(
-        "--process_folder", type=str, default="./outputs/processed/seqs"
+        "--process_folder", type=str, default="/media/sofie-kamber/EFP_Studium/arctic/outputs/processed/seqs"
     )
     args = parser.parse_args()
     return args

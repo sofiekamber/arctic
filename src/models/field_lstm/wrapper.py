@@ -29,7 +29,7 @@ class FieldLSTMWrapper(GenericWrapper):
 
     def set_training_flags(self):
         if not self.started_training:
-            sd_p = f"./logs/{self.args.img_feat_version}/checkpoints/last.ckpt"
+            sd_p = f"/media/sofie-kamber/EFP_Studium/arctic/logs/{self.args.img_feat_version}/checkpoints/last.ckpt"
             sd = torch.load(sd_p)["state_dict"]
             msd = xdict(sd).search("model.").rm("model.backbone")
 

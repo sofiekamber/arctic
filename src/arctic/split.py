@@ -27,7 +27,7 @@ def get_selected_seqs(setup, split):
 
     # load seq names from json
     with open(
-        op.join("./data/arctic_data/data/splits_json/", f"protocol_{setup}.json"), "r"
+        op.join("/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/splits_json/", f"protocol_{setup}.json"), "r"
     ) as f:
         splits = json.load(f)
 
@@ -78,7 +78,7 @@ def get_selected_views(setup, split):
 def glob_fnames(num_frames, seq, chosen_views):
     # construct paths to images
     sid, seq_name = seq.split("/")
-    folder_p = op.join(f"./data/arctic_data/data/images/{sid}/{seq_name}/")
+    folder_p = op.join(f"/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/images/{sid}/{seq_name}/")
 
     # ignore first 10 and last 10 frames as images may be entirely black
     glob_ps = [
@@ -181,9 +181,9 @@ def build_split(protocol, split, request_keys, process_folder):
     out_data["imgnames"] = fnames
 
     if "_verts" in process_folder:
-        out_p = f"./outputs/splits_verts/{protocol}_{split}.npy"
+        out_p = f"/media/sofie-kamber/EFP_Studium/arctic/outputs/splits_verts/{protocol}_{split}.npy"
     else:
-        out_p = f"./outputs/splits/{protocol}_{split}.npy"
+        out_p = f"/media/sofie-kamber/EFP_Studium/arctic/outputs/splits/{protocol}_{split}.npy"
     out_folder = op.dirname(out_p)
     if not op.exists(out_folder):
         os.makedirs(out_folder)

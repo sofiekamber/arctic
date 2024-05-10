@@ -17,14 +17,14 @@ DUMMY_EXP = "xxxxxxxxx"
 
 def add_paths(args):
     exp_key = args.exp_key
-    args_p = f"./logs/{exp_key}/args.json"
-    ckpt_p = f"./logs/{exp_key}/checkpoints/last.ckpt"
+    args_p = f"/media/sofie-kamber/EFP_Studium/arctic/logs/{exp_key}/args.json"
+    ckpt_p = f"/media/sofie-kamber/EFP_Studium/arctic/logs/{exp_key}/checkpoints/last.ckpt"
     if not op.exists(ckpt_p) or DUMMY_EXP in ckpt_p:
         ckpt_p = ""
     if args.resume_ckpt != "":
         ckpt_p = args.resume_ckpt
     args.ckpt_p = ckpt_p
-    args.log_dir = f"./logs/{exp_key}"
+    args.log_dir = f"/media/sofie-kamber/EFP_Studium/arctic/logs/{exp_key}"
 
     if args.infer_ckpt != "":
         basedir = "/".join(args.infer_ckpt.split("/")[:2])

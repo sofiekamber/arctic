@@ -280,6 +280,7 @@ class ArcticDataset(Dataset):
         imgnames = self.imgnames
         if seq is not None:
             imgnames = [imgname for imgname in imgnames if "/" + seq + "/" in imgname]
+        imgnames = ["/media/sofie-kamber/EFP_Studium/arctic/" + imgname.lstrip("./") for imgname in imgnames]
         assert len(imgnames) == len(set(imgnames))
         imgnames = dataset_utils.downsample(imgnames, split)
         self.imgnames = imgnames
@@ -302,7 +303,7 @@ class ArcticDataset(Dataset):
 
         short_split = split.replace("mini", "").replace("tiny", "").replace("small", "")
         data_p = op.join(
-            f"./data/arctic_data/data/splits/{args.setup}_{short_split}.npy"
+            f"/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/splits/{args.setup}_{short_split}.npy"
         )
         logger.info(f"Loading {data_p}")
         data = np.load(data_p, allow_pickle=True).item()
@@ -310,7 +311,7 @@ class ArcticDataset(Dataset):
         self.data = data["data_dict"]
         self.imgnames = data["imgnames"]
 
-        with open("./data/arctic_data/data/meta/misc.json", "r") as f:
+        with open("/media/sofie-kamber/EFP_Studium/arctic/data/arctic_data/data/meta/misc.json", "r") as f:
             misc = json.load(f)
 
         # unpack
