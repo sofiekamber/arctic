@@ -3,8 +3,9 @@ import torch.nn as nn
 
 import common.torch_utils as torch_utils
 from common.torch_utils import nanmean
-import coap
+import common.rot as rot
 from common.body_models import build_mano_coap
+import coap
 
 l1_loss = nn.L1Loss(reduction="none")
 mse_loss = nn.MSELoss(reduction="none")
@@ -59,13 +60,15 @@ def contact_deviation(pred_v3d_o, pred_v3d_r, dist_ro, idx_ro, is_valid, _right_
     return err_ro
 
 def compute_coap_loss(pred):
-    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"], pred["mano.joints3d.r"], is_right=True)
-    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.joints3d.l"], is_right=False)
+    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"], pred["mano.joints3d.r"],
+                            pred["mano.cam_t.r"], pred["mano.pose.r"], is_right=True)
+    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.joints3d.l"],
+                            pred["mano.cam_t.l"], pred["mano.pose.l"], is_right=False)
 
     return coap_loss_r, coap_loss_l
 
 
-def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, is_right):
+def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, transl, rotmat, is_right):
     batch_size = pred_v3d_object.shape[0]
     model = build_mano_coap(is_right, batch_size)
 
@@ -74,16 +77,20 @@ def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, is_right):
 
 
     #prep data
+    rotmat = rot.matrix_to_axis_angle(rotmat.reshape(-1, 3, 3)).reshape(-1, 48)
+
     torch_param = {}
-    torch_param['hand_pose'] = pred_joints3d_r[:, :16,:].view(batch_size, 48) #crop 21 joints to 16
+    torch_param['hand_pose'] = rotmat[:, 3:]
     torch_param['betas'] = pred_betas_r
-    #torch_param['transl'] = torch.from_numpy(np.array([[-5.0101800e-003, 1.5031957e-001, 3.0754370e-002]])).to(torch.float32).to(args.device) #TODO:?
+    torch_param['transl'] = transl
+    torch_param['global_orient'] = rotmat[:, :3]
 
 
     mano_output = model(**torch_param, return_verts=True, return_full_pose=True)
     assert model.joint_mapper is None, 'COAP requires valid SMPL joints as input'
 
     scene_points = sample_scene_points(mano_output, pred_v3d_object, device) #check only points inside Mano bbox
+
     if scene_points is None:
         return torch.zeros(batch_size, device=device)
 
@@ -93,7 +100,7 @@ def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, is_right):
 
 
 @torch.no_grad()
-def sample_scene_points(mano_output, scene_vertices, device, max_queries=10000):
+def sample_scene_points(mano_output, scene_vertices, device, max_queries=1000):
 
     # remove points that are outside the Mano bounding box
     bb_min = mano_output.vertices.min(1).values
@@ -105,12 +112,15 @@ def sample_scene_points(mano_output, scene_vertices, device, max_queries=10000):
     #mask containing all object points inside mano bbox
     mask = (scene_vertices >= bb_min_expanded).all(dim=-1) & (scene_vertices <= bb_max_expanded).all(dim=-1)
 
+
     max_true_count = min(mask.sum(dim=1).max(), max_queries)
 
     if max_true_count == 0:
         return None
 
+    # print("Scene vertices: ", max_true_count)
     padded_scene_vertices = torch.empty((mask.shape[0], max_true_count, 3), dtype=scene_vertices.dtype, device=device)
+
 
     for i in range(scene_vertices.shape[0]):
 
@@ -130,6 +140,7 @@ def sample_scene_points(mano_output, scene_vertices, device, max_queries=10000):
             padded_scene_vertices[i] = true_vertices[:max_true_count]
 
     return padded_scene_vertices.float()
+
 
 def keypoint_3d_loss(pred_keypoints_3d, gt_keypoints_3d, criterion, jts_valid):
     """
