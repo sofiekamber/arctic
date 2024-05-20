@@ -165,7 +165,7 @@ def compute_loss(pred, gt, meta_info, args):
         "loss/mano/kp3d/l": (loss_keypoints_3d_l, 5.0),
         "loss/mano/pose/l": (loss_regr_pose_l, 10.0),
         "loss/cd": (cd_ro + cd_lo, 1.0),
-        "loss/coap": (coap_loss_r + coap_loss_l, 1.0), #TODO: change weight?
+        "loss/coap": (coap_loss_r + coap_loss_l, 0.01), #TODO: change weight?
         "loss/mano/transl/l": (loss_transl_l, 1.0),
         "loss/mano/beta/l": (loss_regr_betas_l, 0.001),
         "loss/object/kp2d": (loss_keypoints_o, 1.0),

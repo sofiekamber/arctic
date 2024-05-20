@@ -65,7 +65,7 @@ def compute_coap_loss(pred):
     coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.joints3d.l"],
                             pred["mano.cam_t.l"], pred["mano.pose.l"], is_right=False)
 
-    return coap_loss_r, coap_loss_l
+    return coap_loss_r.mean(), coap_loss_l.mean()
 
 
 def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, transl, rotmat, is_right):
