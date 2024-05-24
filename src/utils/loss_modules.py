@@ -11,6 +11,8 @@ l1_loss = nn.L1Loss(reduction="none")
 mse_loss = nn.MSELoss(reduction="none")
 
 
+
+
 def subtract_root_batch(joints: torch.Tensor, root_idx: int):
     assert len(joints.shape) == 3
     assert joints.shape[2] == 3
@@ -59,22 +61,19 @@ def contact_deviation(pred_v3d_o, pred_v3d_r, dist_ro, idx_ro, is_valid, _right_
     err_ro = torch_utils.nanmean(cd, axis=1)  # .cpu().numpy()  # m
     return err_ro
 
-def compute_coap_loss(pred):
-    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"], pred["mano.joints3d.r"],
-                            pred["mano.cam_t.r"], pred["mano.pose.r"], is_right=True)
-    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"], pred["mano.joints3d.l"],
-                            pred["mano.cam_t.l"], pred["mano.pose.l"], is_right=False)
+def compute_coap_loss(pred, coap_models):
+    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"],
+                            pred["mano.cam_t.r"], pred["mano.pose.r"], coap_models['right'])
+    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"],
+                            pred["mano.cam_t.l"], pred["mano.pose.l"], coap_models['left'])
 
     return coap_loss_r.mean(), coap_loss_l.mean()
 
 
-def coap_loss(pred_v3d_object, pred_betas_r, pred_joints3d_r, transl, rotmat, is_right):
+def coap_loss(pred_v3d_object, pred_betas_r, transl, rotmat, model):
     batch_size = pred_v3d_object.shape[0]
-    model = build_mano_coap(is_right, batch_size)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    model = coap.attach_coap(model, pretrained=True, device=device) #Need model with pca
-
 
     #prep data
     rotmat = rot.matrix_to_axis_angle(rotmat.reshape(-1, 3, 3)).reshape(-1, 48)
@@ -139,6 +138,12 @@ def sample_scene_points(mano_output, scene_vertices, device, max_queries=1000):
         else:
             padded_scene_vertices[i] = true_vertices[:max_true_count]
 
+    return padded_scene_vertices.float()
+
+
+@torch.no_grad()
+def sample_scene_points2(mano_output, scene_vertices, device, max_queries=1000):
+    padded_scene_vertices = scene_vertices[:, :50, :]
     return padded_scene_vertices.float()
 
 

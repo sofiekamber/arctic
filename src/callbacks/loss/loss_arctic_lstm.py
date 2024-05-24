@@ -15,7 +15,7 @@ l1_loss = nn.L1Loss(reduction="none")
 mse_loss = nn.MSELoss(reduction="none")
 
 
-def compute_loss(pred, gt, meta_info, args):
+def compute_loss(pred, gt, meta_info, args, coap_models):
     # unpacking pred and gt
     pred_betas_r = pred["mano.beta.r"]
     pred_rotmat_r = pred["mano.pose.r"]

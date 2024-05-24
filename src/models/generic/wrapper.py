@@ -10,6 +10,7 @@ from common.comet_utils import push_images
 from common.rend_utils import Renderer
 from common.xdict import xdict
 from src.utils.eval_modules import eval_fn_dict
+from common.body_models import  build_mano_coap
 
 
 def mul_loss_dict(loss_dict):
@@ -37,6 +38,11 @@ class GenericWrapper(AbstractPL):
         self.object_sampler = np.load(
             "./data/arctic_data/data/meta/downsamplers.npy", allow_pickle=True
         ).item()
+
+        # Add coap models to meta_info
+        coap_right = build_mano_coap(True, args['batch_size'])
+        coap_left = build_mano_coap(False, args['batch_size'])
+        self.coap_models = {"right": coap_right, "left": coap_left}
 
     def set_flags(self, mode):
         self.model.mode = mode
@@ -123,7 +129,7 @@ class GenericWrapper(AbstractPL):
         meta_info["mano.faces.l"] = self.mano_l.faces
         pred = self.model(inputs, meta_info)
         loss_dict = self.loss_fn(
-            pred=pred, gt=targets, meta_info=meta_info, args=self.args
+            pred=pred, gt=targets, meta_info=meta_info, args=self.args, coap_models=self.coap_models
         )
         loss_dict = {k: (loss_dict[k][0].mean(), loss_dict[k][1]) for k in loss_dict}
         loss_dict = mul_loss_dict(loss_dict)

@@ -46,7 +46,7 @@ def dist_loss(loss_dict, pred, gt, meta_info):
     return loss_dict
 
 
-def compute_loss(pred, gt, meta_info, args):
+def compute_loss(pred, gt, meta_info, args, coap_models):
     loss_dict = xdict()
     loss_dict = dist_loss(loss_dict, pred, gt, meta_info)
     return loss_dict

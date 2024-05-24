@@ -5,7 +5,7 @@ import torch
 from smplx import MANO
 
 from common.mesh import Mesh
-
+import coap
 
 class MANODecimator:
     def __init__(self):
@@ -135,7 +135,8 @@ def build_mano_aa(is_rhand, create_transl=False, flat_hand=False):
     )
 
 def build_mano_coap(is_rhand, batch_size, create_transl=False, flat_hand=False):
-    return MANO(
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = MANO(
         MODEL_DIR,
         create_transl=create_transl,
         use_pca=True,
@@ -143,7 +144,9 @@ def build_mano_coap(is_rhand, batch_size, create_transl=False, flat_hand=False):
         #flat_hand_mean=flat_hand, #TODO: remove?
         is_rhand=is_rhand,
         batch_size=batch_size,
-    )
+        )
+    coap_model = coap.attach_coap(model, pretrained=True, device=device)
+    return coap_model
 
 
 def construct_layers(dev):

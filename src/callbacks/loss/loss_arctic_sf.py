@@ -16,7 +16,7 @@ l1_loss = nn.L1Loss(reduction="none")
 mse_loss = nn.MSELoss(reduction="none")
 
 
-def compute_loss(pred, gt, meta_info, args):
+def compute_loss(pred, gt, meta_info, args, coap_models):
     # unpacking pred and gt
     pred_betas_r = pred["mano.beta.r"]
     pred_rotmat_r = pred["mano.pose.r"]
@@ -151,7 +151,7 @@ def compute_loss(pred, gt, meta_info, args):
 
     cd_ro, cd_lo = compute_contact_devi_loss(pred, gt)
 
-    coap_loss_r, coap_loss_l = compute_coap_loss(pred)
+    coap_loss_r, coap_loss_l = compute_coap_loss(pred, coap_models)
 
     loss_dict = {
         "loss/mano/cam_t/r": (loss_cam_t_r, 1.0),
@@ -165,7 +165,7 @@ def compute_loss(pred, gt, meta_info, args):
         "loss/mano/kp3d/l": (loss_keypoints_3d_l, 5.0),
         "loss/mano/pose/l": (loss_regr_pose_l, 10.0),
         "loss/cd": (cd_ro + cd_lo, 1.0),
-        "loss/coap": (coap_loss_r + coap_loss_l, 0.01), #TODO: change weight?
+        "loss/coap": (coap_loss_r + coap_loss_l, 1.0), #TODO: change weight?
         "loss/mano/transl/l": (loss_transl_l, 1.0),
         "loss/mano/beta/l": (loss_regr_betas_l, 0.001),
         "loss/object/kp2d": (loss_keypoints_o, 1.0),
