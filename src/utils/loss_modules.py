@@ -75,6 +75,7 @@ def coap_loss(pred_v3d_object, pred_betas_r, transl, rotmat, model, split='train
 
     if split == 'test':
         device = "cpu"
+        rotmat = rotmat.reshape(-1, 48)
     else:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         rotmat = rot.matrix_to_axis_angle(rotmat.reshape(-1, 3, 3)).reshape(-1, 48)
