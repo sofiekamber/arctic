@@ -258,8 +258,9 @@ def eval_coap_loss(pred, targets, meta_info):
     coap_model_r = build_mano_coap(True, 1, "cpu")
     coap_model_l = build_mano_coap(False, 1, "cpu")
 
-    coap_loss_r = torch.tensor([0.0], dtype=torch.float32)
-    coap_loss_l = torch.tensor([0.0], dtype=torch.float32)
+    # Initialize the cumulative losses as empty lists
+    coap_loss_r = []
+    coap_loss_l = []
 
     for b_ind in range(B):
 
@@ -267,9 +268,11 @@ def eval_coap_loss(pred, targets, meta_info):
                                 pred["mano.cam_t.r"][b_ind].unsqueeze(0), pred["mano.pose.r"][b_ind].unsqueeze(0), coap_model_r, 'test')
         loss_l = coap_loss(pred["object.v.cam"][b_ind].unsqueeze(0), pred["mano.beta.l"][b_ind].unsqueeze(0),
                                 pred["mano.cam_t.l"][b_ind].unsqueeze(0), pred["mano.pose.l"][b_ind].unsqueeze(0), coap_model_l, 'test')
-        coap_loss_r += loss_r
-        coap_loss_l += loss_l
+        coap_loss_r.append(loss_r)
+        coap_loss_l.append(loss_l)
 
+    coap_loss_r = torch.cat(coap_loss_r, dim=0)
+    coap_loss_l = torch.cat(coap_loss_l, dim=0)
 
     metric_dict = xdict()
     metric_dict["coap/ro"] = coap_loss_r
