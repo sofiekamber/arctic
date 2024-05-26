@@ -16,6 +16,8 @@ from common.torch_utils import unpad_vtensor
 from common.xdict import xdict
 from src.utils.loss_modules import contact_deviation
 from src.utils.mdev import eval_motion_deviation
+from src.utils.loss_modules import coap_loss
+from common.body_models import build_mano_coap
 
 
 def compute_avg_err(gt_dist, pred_dist, is_valid):
@@ -251,6 +253,25 @@ def eval_contact_deviation(pred, targets, meta_info):
     return metric_dict
 
 
+def eval_coap_loss(pred, targets, meta_info):
+    B = pred["mano.beta.r"].shape[0]
+    coap_model_r = build_mano_coap(True, B)
+    coap_model_l = build_mano_coap(False, B)
+
+    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"],
+                            pred["mano.cam_t.r"], pred["mano.pose.r"], coap_model_r)
+    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"],
+                            pred["mano.cam_t.l"], pred["mano.pose.l"], coap_model_l)
+
+    coap_ho = torch.stack((coap_loss_r.mean(), coap_loss_l.mean()), dim=1)
+    coap_ho = torch_utils.nanmean(coap_ho, dim=1)
+
+
+    metric_dict = xdict()
+    metric_dict["coap/ho"] = coap_ho
+    return metric_dict
+
+
 def compute_error_accel(joints_gt, joints_pred, fps=30.0):
     """
     Computes acceleration error:
@@ -461,4 +482,5 @@ eval_fn_dict = {
     "mdev": eval_motion_deviation,
     "acc_err_pose": eval_acc_pose,
     "acc_err_field": eval_acc_field,
+    "coap": eval_coap_loss,
 }

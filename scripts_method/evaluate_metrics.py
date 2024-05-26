@@ -104,6 +104,7 @@ def main():
             "cdev",
             "mdev",
             "acc_err_pose",
+            "coap",
         ]
     elif "field" in args.task:
         from src.extraction.keys.eval_field import KEYS
