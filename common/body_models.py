@@ -134,8 +134,9 @@ def build_mano_aa(is_rhand, create_transl=False, flat_hand=False):
         is_rhand=is_rhand,
     )
 
-def build_mano_coap(is_rhand, batch_size, create_transl=False, flat_hand=False):
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+def build_mano_coap(is_rhand, batch_size, device=None, create_transl=False, flat_hand=False):
+    if device is None:
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
     model = MANO(
         MODEL_DIR,
         create_transl=create_transl,

@@ -70,13 +70,14 @@ def compute_coap_loss(pred, coap_models):
     return coap_loss_r.mean(), coap_loss_l.mean()
 
 
-def coap_loss(pred_v3d_object, pred_betas_r, transl, rotmat, model):
+def coap_loss(pred_v3d_object, pred_betas_r, transl, rotmat, model, split='train'):
     batch_size = pred_v3d_object.shape[0]
 
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-    #prep data
-    rotmat = rot.matrix_to_axis_angle(rotmat.reshape(-1, 3, 3)).reshape(-1, 48)
+    if split == 'test':
+        device = "cpu"
+    else:
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        rotmat = rot.matrix_to_axis_angle(rotmat.reshape(-1, 3, 3)).reshape(-1, 48)
 
     torch_param = {}
     torch_param['hand_pose'] = rotmat[:, 3:]

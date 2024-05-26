@@ -255,13 +255,13 @@ def eval_contact_deviation(pred, targets, meta_info):
 
 def eval_coap_loss(pred, targets, meta_info):
     B = pred["mano.beta.r"].shape[0]
-    coap_model_r = build_mano_coap(True, B)
-    coap_model_l = build_mano_coap(False, B)
+    coap_model_r = build_mano_coap(True, B, "cpu")
+    coap_model_l = build_mano_coap(False, B, "cpu")
 
     coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"],
-                            pred["mano.cam_t.r"], pred["mano.pose.r"], coap_model_r)
+                            pred["mano.cam_t.r"], pred["mano.pose.r"], coap_model_r, 'test')
     coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"],
-                            pred["mano.cam_t.l"], pred["mano.pose.l"], coap_model_l)
+                            pred["mano.cam_t.l"], pred["mano.pose.l"], coap_model_l, 'test')
 
     coap_ho = torch.stack((coap_loss_r.mean(), coap_loss_l.mean()), dim=1)
     coap_ho = torch_utils.nanmean(coap_ho, dim=1)
