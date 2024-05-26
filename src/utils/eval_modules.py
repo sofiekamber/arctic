@@ -255,20 +255,25 @@ def eval_contact_deviation(pred, targets, meta_info):
 
 def eval_coap_loss(pred, targets, meta_info):
     B = pred["mano.beta.r"].shape[0]
-    coap_model_r = build_mano_coap(True, B, "cpu")
-    coap_model_l = build_mano_coap(False, B, "cpu")
+    coap_model_r = build_mano_coap(True, 1, "cpu")
+    coap_model_l = build_mano_coap(False, 1, "cpu")
 
-    coap_loss_r = coap_loss(pred["object.v.cam"], pred["mano.beta.r"],
-                            pred["mano.cam_t.r"], pred["mano.pose.r"], coap_model_r, 'test')
-    coap_loss_l = coap_loss(pred["object.v.cam"], pred["mano.beta.l"],
-                            pred["mano.cam_t.l"], pred["mano.pose.l"], coap_model_l, 'test')
+    coap_loss_r = torch.tensor([0.0], dtype=torch.float32)
+    coap_loss_l = torch.tensor([0.0], dtype=torch.float32)
 
-    coap_ho = torch.stack((coap_loss_r.mean(), coap_loss_l.mean()), dim=1)
-    coap_ho = torch_utils.nanmean(coap_ho, dim=1)
+    for b_ind in range(B):
+
+        loss_r = coap_loss(pred["object.v.cam"][b_ind].unsqueeze(0), pred["mano.beta.r"][b_ind].unsqueeze(0),
+                                pred["mano.cam_t.r"][b_ind].unsqueeze(0), pred["mano.pose.r"][b_ind].unsqueeze(0), coap_model_r, 'test')
+        loss_l = coap_loss(pred["object.v.cam"][b_ind].unsqueeze(0), pred["mano.beta.l"][b_ind].unsqueeze(0),
+                                pred["mano.cam_t.l"][b_ind].unsqueeze(0), pred["mano.pose.l"][b_ind].unsqueeze(0), coap_model_l, 'test')
+        coap_loss_r += loss_r
+        coap_loss_l += loss_l
 
 
     metric_dict = xdict()
-    metric_dict["coap/ho"] = coap_ho
+    metric_dict["coap/ro"] = coap_loss_r
+    metric_dict["coap/lo"] = coap_loss_l
     return metric_dict
 
 
